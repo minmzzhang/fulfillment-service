@@ -18,6 +18,7 @@ import (
 	. "github.com/onsi/gomega"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 
 	privatev1 "github.com/osac-project/fulfillment-service/internal/api/osac/private/v1"
@@ -147,6 +148,127 @@ var _ = Describe("applyFieldDefinitions", func() {
 		err = applyFieldDefinitions(spec, fieldDefs)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(spec.GetIsWindows()).To(BeTrue())
+	})
+})
+
+var _ = Describe("applyFieldDefinitions rejects unlisted fields", func() {
+	It("rejects a single unlisted field on ClusterSpec", func() {
+		pullSecret := "my-secret"
+		spec := &privatev1.ClusterSpec{
+			PullSecret: &pullSecret,
+		}
+		defaultVal, err := structpb.NewValue("ssh-ed25519 AAAA")
+		Expect(err).ToNot(HaveOccurred())
+		fieldDefs := []*privatev1.FieldDefinition{{
+			Path:     "ssh_public_key",
+			Editable: true,
+			Default:  defaultVal,
+		}}
+		err = applyFieldDefinitions(spec, fieldDefs)
+		Expect(err).To(HaveOccurred())
+		Expect(status.Code(err)).To(Equal(codes.InvalidArgument))
+		Expect(err.Error()).To(ContainSubstring("pull_secret"))
+		Expect(err.Error()).To(ContainSubstring("not allowed"))
+	})
+
+	It("rejects multiple unlisted fields on ClusterSpec", func() {
+		pullSecret := "my-secret"
+		releaseImage := "quay.io/ocp:4.21"
+		spec := &privatev1.ClusterSpec{
+			PullSecret:   &pullSecret,
+			ReleaseImage: &releaseImage,
+		}
+		defaultVal, err := structpb.NewValue("ssh-ed25519 AAAA")
+		Expect(err).ToNot(HaveOccurred())
+		fieldDefs := []*privatev1.FieldDefinition{{
+			Path:     "ssh_public_key",
+			Editable: true,
+			Default:  defaultVal,
+		}}
+		err = applyFieldDefinitions(spec, fieldDefs)
+		Expect(err).To(HaveOccurred())
+		Expect(status.Code(err)).To(Equal(codes.InvalidArgument))
+		Expect(err.Error()).To(ContainSubstring("pull_secret"))
+		Expect(err.Error()).To(ContainSubstring("release_image"))
+	})
+
+	It("accepts when all fields are covered by field_definitions", func() {
+		pullSecret := "my-secret"
+		sshKey := "ssh-ed25519 AAAA"
+		spec := &privatev1.ClusterSpec{
+			PullSecret:   &pullSecret,
+			SshPublicKey: &sshKey,
+		}
+		fieldDefs := []*privatev1.FieldDefinition{
+			{Path: "pull_secret", Editable: true},
+			{Path: "ssh_public_key", Editable: true},
+		}
+		err := applyFieldDefinitions(spec, fieldDefs)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("always allows catalog_item without a field_definition", func() {
+		spec := privatev1.ClusterSpec_builder{
+			CatalogItem: "cat-123",
+		}.Build()
+		defaultVal, err := structpb.NewValue("ssh-ed25519 AAAA")
+		Expect(err).ToNot(HaveOccurred())
+		fieldDefs := []*privatev1.FieldDefinition{{
+			Path:     "ssh_public_key",
+			Editable: true,
+			Default:  defaultVal,
+		}}
+		err = applyFieldDefinitions(spec, fieldDefs)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("always allows template without a field_definition", func() {
+		spec := privatev1.ClusterSpec_builder{
+			Template: "my-template",
+		}.Build()
+		defaultVal, err := structpb.NewValue("ssh-ed25519 AAAA")
+		Expect(err).ToNot(HaveOccurred())
+		fieldDefs := []*privatev1.FieldDefinition{{
+			Path:     "ssh_public_key",
+			Editable: true,
+			Default:  defaultVal,
+		}}
+		err = applyFieldDefinitions(spec, fieldDefs)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("parent field_definition covers nested children", func() {
+		spec := privatev1.ClusterSpec_builder{
+			Network: privatev1.ClusterNetwork_builder{
+				PodCidr:     proto.String("10.128.0.0/14"),
+				ServiceCidr: proto.String("172.30.0.0/16"),
+			}.Build(),
+		}.Build()
+		fieldDefs := []*privatev1.FieldDefinition{{
+			Path:     "network",
+			Editable: true,
+		}}
+		err := applyFieldDefinitions(spec, fieldDefs)
+		Expect(err).ToNot(HaveOccurred())
+	})
+
+	It("rejects unlisted field on ComputeInstanceSpec", func() {
+		cores := int32(4)
+		spec := &privatev1.ComputeInstanceSpec{
+			Cores: &cores,
+		}
+		defaultVal, err := structpb.NewValue("ssh-ed25519 AAAA")
+		Expect(err).ToNot(HaveOccurred())
+		fieldDefs := []*privatev1.FieldDefinition{{
+			Path:     "ssh_key",
+			Editable: true,
+			Default:  defaultVal,
+		}}
+		err = applyFieldDefinitions(spec, fieldDefs)
+		Expect(err).To(HaveOccurred())
+		Expect(status.Code(err)).To(Equal(codes.InvalidArgument))
+		Expect(err.Error()).To(ContainSubstring("cores"))
+		Expect(err.Error()).To(ContainSubstring("not allowed"))
 	})
 })
 

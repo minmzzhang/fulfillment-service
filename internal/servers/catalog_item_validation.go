@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -87,6 +88,27 @@ func applyFieldDefinitions(
 	var specMap map[string]any
 	if err := json.Unmarshal(specJSON, &specMap); err != nil {
 		return grpcstatus.Errorf(grpccodes.Internal, "failed to parse spec: %v", err)
+	}
+
+	allowedPaths := map[string]bool{
+		"catalog_item": true,
+		"template":     true,
+	}
+	for _, fd := range fieldDefinitions {
+		if fd.GetPath() != "" {
+			allowedPaths[fd.GetPath()] = true
+		}
+	}
+	var unlisted []string
+	for _, path := range collectLeafPaths(specMap, "") {
+		if !isPathCovered(path, allowedPaths) {
+			unlisted = append(unlisted, path)
+		}
+	}
+	if len(unlisted) > 0 {
+		slices.Sort(unlisted)
+		return grpcstatus.Errorf(grpccodes.InvalidArgument,
+			"fields not allowed by catalog item: %s", strings.Join(unlisted, ", "))
 	}
 
 	compiler := jsonschema.NewCompiler()
@@ -232,6 +254,34 @@ func setNestedValue(m map[string]any, path string, value any) {
 		}
 		current = currentMap
 	}
+}
+
+func collectLeafPaths(m map[string]any, prefix string) []string {
+	var paths []string
+	for key, val := range m {
+		fullPath := key
+		if prefix != "" {
+			fullPath = prefix + "." + key
+		}
+		if nested, ok := val.(map[string]any); ok {
+			paths = append(paths, collectLeafPaths(nested, fullPath)...)
+		} else {
+			paths = append(paths, fullPath)
+		}
+	}
+	return paths
+}
+
+func isPathCovered(path string, allowedPaths map[string]bool) bool {
+	if allowedPaths[path] {
+		return true
+	}
+	for i := range path {
+		if path[i] == '.' && allowedPaths[path[:i]] {
+			return true
+		}
+	}
+	return false
 }
 
 // validateInstanceTypeState looks up an instance type by name and validates its state.
