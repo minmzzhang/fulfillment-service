@@ -171,8 +171,9 @@ default, optionally constrained by a `validation_schema`.
 
 ### Available Paths
 
-The following paths can be used in `field_definitions`. These are the only values that have an
-effect — any other path is silently ignored.
+The following paths can be used in `field_definitions`. When a user creates a resource from a
+catalog item, the server rejects any spec field not listed in `field_definitions` with an
+`InvalidArgument` error.
 
 **ClusterCatalogItem** paths:
 
@@ -232,14 +233,16 @@ osac create cluster --catalog-item dev-sandbox \
 CLI flags like `--pull-secret` and `--ssh-public-key` set values in the resource spec. However,
 the server applies `field_definitions` **after** receiving the request, which means:
 
-- If a field is **non-editable** in the catalog item, the CLI flag value is **overridden** by the
-  catalog item's default — the user's value is silently discarded.
+- If a field is **not listed** in `field_definitions`, the server **rejects** the request with
+  `InvalidArgument`.
+- If a field is **non-editable** in the catalog item and the user provides a value, the server
+  **rejects** the request with `InvalidArgument`.
 - If a field is **editable**, the CLI flag value is accepted and validated against
   `validation_schema` if one is defined.
 - If an editable field is **not provided** by the user, the catalog item's default is applied.
 
 For example, given a catalog item with `ssh_public_key` set as non-editable with a fixed default,
-running `--ssh-public-key "my-key"` has no effect — the catalog item's default is always used.
+running `--ssh-public-key "my-key"` results in an error — the user cannot override locked fields.
 
 ### Server-side processing
 
@@ -248,7 +251,8 @@ When the server processes the request, it:
 1. Looks up the catalog item and verifies it is published
 2. Sets the resource's `spec.template` to the template referenced by the catalog item
 3. Applies `field_definitions`:
-   - **Non-editable fields**: the default value is enforced, overriding any user-provided value
+   - **Unlisted fields**: any spec field not in `field_definitions` is rejected (`InvalidArgument`)
+   - **Non-editable fields**: rejects if the user provided a value; otherwise applies the default
    - **Editable fields with a user value**: validated against `validation_schema` if present
    - **Editable fields without a user value**: the default is applied
 4. Validates the resulting spec and creates the resource
