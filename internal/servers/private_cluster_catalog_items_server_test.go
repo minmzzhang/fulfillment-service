@@ -522,7 +522,14 @@ var _ = Describe("Private cluster catalog items server", func() {
 				}.Build(),
 			}.Build())
 			Expect(err).ToNot(HaveOccurred())
-			Expect(response.GetObject()).ToNot(BeNil())
+			object := response.GetObject()
+			Expect(object).ToNot(BeNil())
+			DeferCleanup(func() {
+				_, err := server.Delete(ctx, privatev1.ClusterCatalogItemsDeleteRequest_builder{
+					Id: object.GetId(),
+				}.Build())
+				Expect(err).ToNot(HaveOccurred())
+			})
 		})
 
 		It("Accepts editable field definition without default value", func() {
@@ -539,7 +546,14 @@ var _ = Describe("Private cluster catalog items server", func() {
 				}.Build(),
 			}.Build())
 			Expect(err).ToNot(HaveOccurred())
-			Expect(response.GetObject()).ToNot(BeNil())
+			object := response.GetObject()
+			Expect(object).ToNot(BeNil())
+			DeferCleanup(func() {
+				_, err := server.Delete(ctx, privatev1.ClusterCatalogItemsDeleteRequest_builder{
+					Id: object.GetId(),
+				}.Build())
+				Expect(err).ToNot(HaveOccurred())
+			})
 		})
 
 		It("Rejects non-editable field definition without default when not first in list", func() {
@@ -603,7 +617,14 @@ var _ = Describe("Private cluster catalog items server", func() {
 				}.Build(),
 			}.Build())
 			Expect(err).ToNot(HaveOccurred())
-			Expect(response.GetObject()).ToNot(BeNil())
+			object := response.GetObject()
+			Expect(object).ToNot(BeNil())
+			DeferCleanup(func() {
+				_, err := server.Delete(ctx, privatev1.ClusterCatalogItemsDeleteRequest_builder{
+					Id: object.GetId(),
+				}.Build())
+				Expect(err).ToNot(HaveOccurred())
+			})
 		})
 
 		It("Rejects update that introduces non-editable field without default", func() {
@@ -615,6 +636,12 @@ var _ = Describe("Private cluster catalog items server", func() {
 			}.Build())
 			Expect(err).ToNot(HaveOccurred())
 			id := createResponse.GetObject().GetId()
+			DeferCleanup(func() {
+				_, err := server.Delete(ctx, privatev1.ClusterCatalogItemsDeleteRequest_builder{
+					Id: id,
+				}.Build())
+				Expect(err).ToNot(HaveOccurred())
+			})
 
 			_, err = server.Update(ctx, privatev1.ClusterCatalogItemsUpdateRequest_builder{
 				Object: privatev1.ClusterCatalogItem_builder{
@@ -647,6 +674,12 @@ var _ = Describe("Private cluster catalog items server", func() {
 			}.Build())
 			Expect(err).ToNot(HaveOccurred())
 			id := createResponse.GetObject().GetId()
+			DeferCleanup(func() {
+				_, err := server.Delete(ctx, privatev1.ClusterCatalogItemsDeleteRequest_builder{
+					Id: id,
+				}.Build())
+				Expect(err).ToNot(HaveOccurred())
+			})
 
 			_, err = server.Update(ctx, privatev1.ClusterCatalogItemsUpdateRequest_builder{
 				Object: privatev1.ClusterCatalogItem_builder{
@@ -679,6 +712,12 @@ var _ = Describe("Private cluster catalog items server", func() {
 			}.Build())
 			Expect(err).ToNot(HaveOccurred())
 			id := createResponse.GetObject().GetId()
+			DeferCleanup(func() {
+				_, err := server.Delete(ctx, privatev1.ClusterCatalogItemsDeleteRequest_builder{
+					Id: id,
+				}.Build())
+				Expect(err).ToNot(HaveOccurred())
+			})
 
 			updateResponse, err := server.Update(ctx, privatev1.ClusterCatalogItemsUpdateRequest_builder{
 				Object: privatev1.ClusterCatalogItem_builder{
