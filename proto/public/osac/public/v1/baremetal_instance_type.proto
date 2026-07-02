@@ -21,6 +21,15 @@ import "google/protobuf/timestamp.proto";
 import "osac/public/v1/condition_status_type.proto";
 import "osac/public/v1/metadata_type.proto";
 
+// Contains the image configuration for a bare metal instance.
+message BareMetalInstanceImage {
+  // Image source type (e.g. "registry").
+  string source_type = 1;
+
+  // Image reference (e.g. OCI image URL).
+  string source_ref = 2;
+}
+
 // Contains the details of a bare metal instance.
 //
 // The `spec` contains the desired details, and may be modified by the user. The `status` contains the current status
@@ -94,6 +103,9 @@ message BareMetalInstanceSpec {
   //
   // These parameters can't be modified after the bare metal instance is created.
   map<string, google.protobuf.Any> template_parameters = 6 [(google.api.field_behavior) = IMMUTABLE];
+
+  // OS base image configuration.
+  optional BareMetalInstanceImage image = 7 [(google.api.field_behavior) = IMMUTABLE];
 }
 
 // The status contains the details of the bare metal instance provided by the system.
