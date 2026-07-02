@@ -24,6 +24,9 @@ import "osac/private/v1/cluster_type.proto";
 import "osac/private/v1/compute_instance_catalog_item_type.proto";
 import "osac/private/v1/compute_instance_template_type.proto";
 import "osac/private/v1/compute_instance_type.proto";
+import "osac/private/v1/external_ip_attachment_type.proto";
+import "osac/private/v1/external_ip_pool_type.proto";
+import "osac/private/v1/external_ip_type.proto";
 import "osac/private/v1/host_type_type.proto";
 import "osac/private/v1/hub_type.proto";
 import "osac/private/v1/identity_provider_type.proto";
@@ -82,6 +85,9 @@ message Event {
     Tenant tenant = 31;
     IdentityProvider identity_provider = 32;
     ProjectMembership project_membership = 33;
+    ExternalIPPool external_ip_pool = 34;
+    ExternalIP external_ip = 35;
+    ExternalIPAttachment external_ip_attachment = 36;
   }
 }
 
