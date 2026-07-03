@@ -16,6 +16,7 @@ syntax = "proto3";
 package osac.public.v1;
 
 import "google/protobuf/any.proto";
+import "osac/public/v1/baremetal_instance_type.proto";
 import "osac/public/v1/metadata_type.proto";
 
 // A bare metal instance template defines a hardware profile (host type, OS image, network configuration)
@@ -94,6 +95,7 @@ message BareMetalInstanceTemplateParameterDefinition {
 }
 
 // Default values for bare metal instance spec fields.
-// No overridable spec fields are defined in this initial version; fields will be added in future
-// enhancements as tenant-configurable options are introduced (e.g. networking integration).
-message BareMetalInstanceTemplateSpecDefaults {}
+message BareMetalInstanceTemplateSpecDefaults {
+  // Default OS base image used when the tenant does not specify one.
+  optional BareMetalInstanceImage image = 1;
+}
