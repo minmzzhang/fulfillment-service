@@ -632,7 +632,7 @@ var _ = Describe("run", func() {
 		})
 
 		When("creating a Tenant CRD on a hub fails", func() {
-			It("sets status to FAILED with error message", func() {
+			It("sets status to FAILED and returns the error for requeue", func() {
 				expectedErr := errors.New("create failed")
 				fakeClient := fake.NewClientBuilder().
 					WithScheme(scheme).
@@ -675,7 +675,7 @@ var _ = Describe("run", func() {
 				f := newFunction(mockHubCache, mockHubs, mockTenants, mockProjects)
 				err := f.run(ctx, tenant)
 
-				Expect(err).ToNot(HaveOccurred())
+				Expect(err).To(HaveOccurred())
 				Expect(tenant.GetStatus().GetState()).To(
 					Equal(privatev1.TenantState_TENANT_STATE_FAILED),
 				)
@@ -685,6 +685,169 @@ var _ = Describe("run", func() {
 				Expect(tenant.GetStatus().GetMessage()).ToNot(
 					ContainSubstring("create failed"),
 				)
+			})
+		})
+
+		When("first hub succeeds but second hub fails", func() {
+			It("persists hub1 resources and sets FAILED for hub2", func() {
+				fakeClient1 := fake.NewClientBuilder().WithScheme(scheme).Build()
+				expectedErr := errors.New("hub2 unreachable")
+				fakeClient2 := fake.NewClientBuilder().
+					WithScheme(scheme).
+					WithInterceptorFuncs(interceptor.Funcs{
+						Create: func(ctx context.Context, client clnt.WithWatch, obj clnt.Object, opts ...clnt.CreateOption) error {
+							return expectedErr
+						},
+					}).
+					Build()
+
+				mockHubs.EXPECT().
+					List(gomock.Any(), gomock.Any()).
+					Return(&privatev1.HubsListResponse{
+						Size:  2,
+						Total: 2,
+						Items: []*privatev1.Hub{
+							privatev1.Hub_builder{Id: hub1ID}.Build(),
+							privatev1.Hub_builder{Id: hub2ID}.Build(),
+						},
+					}, nil)
+
+				mockHubCache.EXPECT().
+					Get(gomock.Any(), hub1ID).
+					Return(&controllers.HubEntry{Namespace: namespace1, Client: fakeClient1}, nil)
+				mockHubCache.EXPECT().
+					Get(gomock.Any(), hub2ID).
+					Return(&controllers.HubEntry{Namespace: namespace2, Client: fakeClient2}, nil)
+
+				mockTenants.EXPECT().
+					Update(gomock.Any(), gomock.Any(), gomock.Any()).
+					DoAndReturn(func(ctx context.Context, req *privatev1.TenantsUpdateRequest, opts ...grpc.CallOption) (*privatev1.TenantsUpdateResponse, error) {
+						return &privatev1.TenantsUpdateResponse{Object: req.GetObject()}, nil
+					})
+
+				tenant := privatev1.Tenant_builder{
+					Id: tenantID,
+					Metadata: privatev1.Metadata_builder{
+						Name:       tenantID,
+						Finalizers: []string{finalizers.Controller},
+						Tenant:     tenantName,
+					}.Build(),
+				}.Build()
+
+				f := newFunction(mockHubCache, mockHubs, mockTenants)
+				err := f.run(ctx, tenant)
+
+				Expect(err).To(HaveOccurred())
+				Expect(tenant.GetStatus().GetState()).To(
+					Equal(privatev1.TenantState_TENANT_STATE_FAILED),
+				)
+				Expect(tenant.GetStatus().GetMessage()).To(ContainSubstring(hub2ID))
+
+				list1 := &osacv1alpha1.TenantList{}
+				Expect(fakeClient1.List(ctx, list1)).To(Succeed())
+				Expect(list1.Items).To(HaveLen(1))
+
+				ns1 := &corev1.Namespace{}
+				Expect(fakeClient1.Get(ctx, clnt.ObjectKey{Name: tenantID}, ns1)).To(Succeed())
+			})
+		})
+
+		When("tenant was previously FAILED (no IDP sync) and hub sync now succeeds", func() {
+			It("clears the failed state back to PENDING", func() {
+				fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+				mockHubs.EXPECT().
+					List(gomock.Any(), gomock.Any()).
+					Return(&privatev1.HubsListResponse{
+						Size:  1,
+						Total: 1,
+						Items: []*privatev1.Hub{
+							privatev1.Hub_builder{Id: hub1ID}.Build(),
+						},
+					}, nil)
+
+				mockHubCache.EXPECT().
+					Get(gomock.Any(), hub1ID).
+					Return(&controllers.HubEntry{Namespace: namespace1, Client: fakeClient}, nil)
+
+				mockTenants.EXPECT().
+					Update(gomock.Any(), gomock.Any(), gomock.Any()).
+					DoAndReturn(func(ctx context.Context, req *privatev1.TenantsUpdateRequest, opts ...grpc.CallOption) (*privatev1.TenantsUpdateResponse, error) {
+						return &privatev1.TenantsUpdateResponse{Object: req.GetObject()}, nil
+					})
+
+				tenant := privatev1.Tenant_builder{
+					Id: tenantID,
+					Metadata: privatev1.Metadata_builder{
+						Name:       tenantID,
+						Finalizers: []string{finalizers.Controller},
+						Tenant:     tenantName,
+					}.Build(),
+					Status: privatev1.TenantStatus_builder{
+						State:   privatev1.TenantState_TENANT_STATE_FAILED,
+						Message: new("previous failure"),
+					}.Build(),
+				}.Build()
+
+				f := newFunction(mockHubCache, mockHubs, mockTenants)
+				err := f.run(ctx, tenant)
+
+				Expect(err).ToNot(HaveOccurred())
+				Expect(tenant.GetStatus().GetState()).To(
+					Equal(privatev1.TenantState_TENANT_STATE_PENDING),
+				)
+				Expect(tenant.GetStatus().HasMessage()).To(BeFalse())
+			})
+		})
+
+		When("tenant was previously FAILED (IDP already synced) and hub sync now succeeds", func() {
+			It("restores state to SYNCED instead of PENDING", func() {
+				fakeClient := fake.NewClientBuilder().WithScheme(scheme).Build()
+
+				mockHubs.EXPECT().
+					List(gomock.Any(), gomock.Any()).
+					Return(&privatev1.HubsListResponse{
+						Size:  1,
+						Total: 1,
+						Items: []*privatev1.Hub{
+							privatev1.Hub_builder{Id: hub1ID}.Build(),
+						},
+					}, nil)
+
+				mockHubCache.EXPECT().
+					Get(gomock.Any(), hub1ID).
+					Return(&controllers.HubEntry{Namespace: namespace1, Client: fakeClient}, nil)
+
+				mockTenants.EXPECT().
+					Update(gomock.Any(), gomock.Any(), gomock.Any()).
+					DoAndReturn(func(ctx context.Context, req *privatev1.TenantsUpdateRequest, opts ...grpc.CallOption) (*privatev1.TenantsUpdateResponse, error) {
+						return &privatev1.TenantsUpdateResponse{Object: req.GetObject()}, nil
+					})
+
+				idpName := "my-idp-tenant"
+				tenant := privatev1.Tenant_builder{
+					Id: tenantID,
+					Metadata: privatev1.Metadata_builder{
+						Name:       tenantID,
+						Finalizers: []string{finalizers.Controller},
+						Tenant:     tenantName,
+					}.Build(),
+					Status: privatev1.TenantStatus_builder{
+						State:         privatev1.TenantState_TENANT_STATE_FAILED,
+						Message:       new("hub sync failure"),
+						IdpTenantName: idpName,
+					}.Build(),
+				}.Build()
+
+				f := newFunction(mockHubCache, mockHubs, mockTenants)
+				err := f.run(ctx, tenant)
+
+				Expect(err).ToNot(HaveOccurred())
+				Expect(tenant.GetStatus().GetState()).To(
+					Equal(privatev1.TenantState_TENANT_STATE_SYNCED),
+				)
+				Expect(tenant.GetStatus().HasMessage()).To(BeFalse())
+				Expect(tenant.GetStatus().GetIdpTenantName()).To(Equal(idpName))
 			})
 		})
 	})
