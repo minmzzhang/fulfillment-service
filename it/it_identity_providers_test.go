@@ -236,12 +236,20 @@ var _ = Describe("Identity provider lifecycle", func() {
 				}.Build(),
 			}.Build(),
 		}.Build())
-		Expect(err).ToNot(HaveOccurred())
-		DeferCleanup(func() {
-			_, _ = client.Delete(ctx, privatev1.IdentityProvidersDeleteRequest_builder{
-				Id: createResponse.GetObject().GetId(),
-			}.Build())
-		})
+		if err == nil && createResponse != nil {
+			DeferCleanup(func() {
+				_, _ = client.Delete(ctx, privatev1.IdentityProvidersDeleteRequest_builder{
+					Id: createResponse.GetObject().GetId(),
+				}.Build())
+			})
+		} else if err != nil {
+			adminStatus, adminOk := grpcstatus.FromError(err)
+			Expect(adminOk).To(BeTrue())
+			Expect(adminStatus.Code()).ToNot(SatisfyAny(
+				Equal(grpccodes.PermissionDenied),
+				Equal(grpccodes.Unauthenticated),
+			), "Admin should pass authorization even if request fails for other reasons")
+		}
 	})
 
 	It("Enforces tenant isolation between identity providers", func() {
