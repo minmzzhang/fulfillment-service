@@ -31,6 +31,7 @@ import "osac/private/v1/host_type_type.proto";
 import "osac/private/v1/hub_type.proto";
 import "osac/private/v1/identity_provider_type.proto";
 import "osac/private/v1/instance_type_type.proto";
+import "osac/private/v1/nat_gateway_type.proto";
 import "osac/private/v1/network_class_type.proto";
 import "osac/private/v1/project_membership_type.proto";
 import "osac/private/v1/project_type.proto";
@@ -88,6 +89,7 @@ message Event {
     ExternalIPPool external_ip_pool = 34;
     ExternalIP external_ip = 35;
     ExternalIPAttachment external_ip_attachment = 36;
+    NATGateway nat_gateway = 37;
   }
 }
 
