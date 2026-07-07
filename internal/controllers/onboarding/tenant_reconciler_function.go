@@ -118,15 +118,15 @@ func (r *function) run(ctx context.Context, tenant *privatev1.Tenant) error {
 	} else {
 		err = t.update(ctx)
 	}
-	if err != nil {
-		return err
-	}
 	updateMask := r.maskCalculator.Calculate(oldTenant, tenant)
 	if len(updateMask.GetPaths()) > 0 {
-		_, err = r.tenantsClient.Update(ctx, privatev1.TenantsUpdateRequest_builder{
+		_, updateErr := r.tenantsClient.Update(ctx, privatev1.TenantsUpdateRequest_builder{
 			Object:     tenant,
 			UpdateMask: updateMask,
 		}.Build())
+		if err == nil {
+			err = updateErr
+		}
 	}
 	return err
 }
@@ -154,11 +154,34 @@ func (t *task) update(ctx context.Context) error {
 		}
 
 		if err := t.createOrUpdateOnHub(ctx, hub.GetId(), hubEntry); err != nil {
+			t.r.logger.ErrorContext(ctx, "Failed to sync tenant to hub",
+				slog.String("hub_id", hub.GetId()),
+				slog.String("tenant_id", t.tenant.GetId()),
+				slog.String("error", err.Error()),
+			)
+			t.setFailed(fmt.Sprintf(
+				"Failed to sync tenant to hub '%s'", hub.GetId(),
+			))
 			return err
 		}
 	}
 
+	t.clearFailed()
 	return nil
+}
+
+func (t *task) clearFailed() {
+	if !t.tenant.HasStatus() {
+		return
+	}
+	if t.tenant.GetStatus().GetState() == privatev1.TenantState_TENANT_STATE_FAILED {
+		if t.tenant.GetStatus().GetIdpTenantName() != "" {
+			t.tenant.GetStatus().SetState(privatev1.TenantState_TENANT_STATE_SYNCED)
+		} else {
+			t.tenant.GetStatus().SetState(privatev1.TenantState_TENANT_STATE_PENDING)
+		}
+		t.tenant.GetStatus().ClearMessage()
+	}
 }
 
 func (t *task) createOrUpdateOnHub(ctx context.Context, hubId string, hubEntry *controllers.HubEntry) error {
@@ -377,4 +400,12 @@ func (t *task) removeFinalizer() {
 		})
 		t.tenant.GetMetadata().SetFinalizers(list)
 	}
+}
+
+func (t *task) setFailed(message string) {
+	if !t.tenant.HasStatus() {
+		t.tenant.SetStatus(&privatev1.TenantStatus{})
+	}
+	t.tenant.GetStatus().SetState(privatev1.TenantState_TENANT_STATE_FAILED)
+	t.tenant.GetStatus().SetMessage(message)
 }
