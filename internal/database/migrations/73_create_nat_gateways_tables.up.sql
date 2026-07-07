@@ -72,10 +72,6 @@ create unique index nat_gateways_one_per_virtual_network
     and data -> 'spec' ->> 'virtual_network' != ''
     and deletion_timestamp = 'epoch';
 
--- Index for child reference lookups used by the VN delete trigger.
-create index nat_gateways_by_virtual_network on nat_gateways ((data->'spec'->>'virtual_network'))
-  where deletion_timestamp = 'epoch';
-
 -- Update the existing check_virtual_network_not_in_use function to also check for active NATGateways.
 create or replace function check_virtual_network_not_in_use() returns trigger as $$
 declare
