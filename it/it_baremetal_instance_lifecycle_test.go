@@ -152,4 +152,325 @@ var _ = Describe("BareMetalInstance lifecycle", func() {
 		Expect(ok).To(BeTrue())
 		Expect(status.Code()).To(Equal(grpccodes.NotFound))
 	})
+
+	It("Creates BareMetalInstance with image and persists it", func(ctx context.Context) {
+		createResp, err := bareMetalInstancesClient.Create(ctx, publicv1.BareMetalInstancesCreateRequest_builder{
+			Object: publicv1.BareMetalInstance_builder{
+				Spec: publicv1.BareMetalInstanceSpec_builder{
+					CatalogItem: catalogItemId,
+					Image: publicv1.BareMetalInstanceImage_builder{
+						SourceType: "registry",
+						SourceRef:  "quay.io/test/rhel9:latest",
+					}.Build(),
+				}.Build(),
+			}.Build(),
+		}.Build())
+		Expect(err).ToNot(HaveOccurred())
+		bareMetalInstanceId := createResp.GetObject().GetId()
+		DeferCleanup(func(ctx context.Context) {
+			_, err := privateBareMetalInstancesClient.Delete(ctx, privatev1.BareMetalInstancesDeleteRequest_builder{
+				Id: bareMetalInstanceId,
+			}.Build())
+			Expect(err).ToNot(HaveOccurred())
+			Eventually(func(g Gomega) {
+				_, err := privateBareMetalInstancesClient.Get(ctx, privatev1.BareMetalInstancesGetRequest_builder{
+					Id: bareMetalInstanceId,
+				}.Build())
+				g.Expect(err).To(HaveOccurred())
+				status, ok := grpcstatus.FromError(err)
+				g.Expect(ok).To(BeTrue())
+				g.Expect(status.Code()).To(Equal(grpccodes.NotFound))
+			}, time.Minute, time.Second).Should(Succeed())
+		})
+
+		getResp, err := bareMetalInstancesClient.Get(ctx, publicv1.BareMetalInstancesGetRequest_builder{
+			Id: bareMetalInstanceId,
+		}.Build())
+		Expect(err).ToNot(HaveOccurred())
+		image := getResp.GetObject().GetSpec().GetImage()
+		Expect(image).ToNot(BeNil())
+		Expect(image.GetSourceType()).To(Equal("registry"))
+		Expect(image.GetSourceRef()).To(Equal("quay.io/test/rhel9:latest"))
+	})
+
+	It("Creates BareMetalInstance without image when no template default", func(ctx context.Context) {
+		createResp, err := bareMetalInstancesClient.Create(ctx, publicv1.BareMetalInstancesCreateRequest_builder{
+			Object: publicv1.BareMetalInstance_builder{
+				Spec: publicv1.BareMetalInstanceSpec_builder{
+					CatalogItem: catalogItemId,
+				}.Build(),
+			}.Build(),
+		}.Build())
+		Expect(err).ToNot(HaveOccurred())
+		bareMetalInstanceId := createResp.GetObject().GetId()
+		DeferCleanup(func(ctx context.Context) {
+			_, err := privateBareMetalInstancesClient.Delete(ctx, privatev1.BareMetalInstancesDeleteRequest_builder{
+				Id: bareMetalInstanceId,
+			}.Build())
+			Expect(err).ToNot(HaveOccurred())
+			Eventually(func(g Gomega) {
+				_, err := privateBareMetalInstancesClient.Get(ctx, privatev1.BareMetalInstancesGetRequest_builder{
+					Id: bareMetalInstanceId,
+				}.Build())
+				g.Expect(err).To(HaveOccurred())
+				status, ok := grpcstatus.FromError(err)
+				g.Expect(ok).To(BeTrue())
+				g.Expect(status.Code()).To(Equal(grpccodes.NotFound))
+			}, time.Minute, time.Second).Should(Succeed())
+		})
+
+		getResp, err := bareMetalInstancesClient.Get(ctx, publicv1.BareMetalInstancesGetRequest_builder{
+			Id: bareMetalInstanceId,
+		}.Build())
+		Expect(err).ToNot(HaveOccurred())
+		Expect(getResp.GetObject().GetSpec().HasImage()).To(BeFalse(),
+			"BareMetalInstance created without image should have no image set")
+	})
+
+	It("Applies template spec_defaults image when user omits image", func(ctx context.Context) {
+		imageTemplateResp, err := bareMetalInstanceTemplatesClient.Create(ctx,
+			privatev1.BareMetalInstanceTemplatesCreateRequest_builder{
+				Object: privatev1.BareMetalInstanceTemplate_builder{
+					Title:       "Template with image default",
+					Description: "Template that provides a default image via spec_defaults.",
+					SpecDefaults: privatev1.BareMetalInstanceTemplateSpecDefaults_builder{
+						Image: privatev1.BareMetalInstanceImage_builder{
+							SourceType: "registry",
+							SourceRef:  "quay.io/default/os:latest",
+						}.Build(),
+					}.Build(),
+				}.Build(),
+			}.Build())
+		Expect(err).ToNot(HaveOccurred())
+		imageTemplateId := imageTemplateResp.GetObject().GetId()
+		DeferCleanup(func(ctx context.Context) {
+			_, err := bareMetalInstanceTemplatesClient.Delete(ctx, privatev1.BareMetalInstanceTemplatesDeleteRequest_builder{
+				Id: imageTemplateId,
+			}.Build())
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		imageCatalogResp, err := bareMetalInstanceCatalogItemsClient.Create(ctx,
+			privatev1.BareMetalInstanceCatalogItemsCreateRequest_builder{
+				Object: privatev1.BareMetalInstanceCatalogItem_builder{
+					Title:     "Catalog item with image default template",
+					Template:  imageTemplateId,
+					Published: true,
+				}.Build(),
+			}.Build())
+		Expect(err).ToNot(HaveOccurred())
+		imageCatalogItemId := imageCatalogResp.GetObject().GetId()
+		DeferCleanup(func(ctx context.Context) {
+			_, err := bareMetalInstanceCatalogItemsClient.Delete(ctx,
+				privatev1.BareMetalInstanceCatalogItemsDeleteRequest_builder{
+					Id: imageCatalogItemId,
+				}.Build())
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		createResp, err := bareMetalInstancesClient.Create(ctx, publicv1.BareMetalInstancesCreateRequest_builder{
+			Object: publicv1.BareMetalInstance_builder{
+				Spec: publicv1.BareMetalInstanceSpec_builder{
+					CatalogItem: imageCatalogItemId,
+				}.Build(),
+			}.Build(),
+		}.Build())
+		Expect(err).ToNot(HaveOccurred())
+		bareMetalInstanceId := createResp.GetObject().GetId()
+		DeferCleanup(func(ctx context.Context) {
+			_, err := privateBareMetalInstancesClient.Delete(ctx, privatev1.BareMetalInstancesDeleteRequest_builder{
+				Id: bareMetalInstanceId,
+			}.Build())
+			Expect(err).ToNot(HaveOccurred())
+			Eventually(func(g Gomega) {
+				_, err := privateBareMetalInstancesClient.Get(ctx, privatev1.BareMetalInstancesGetRequest_builder{
+					Id: bareMetalInstanceId,
+				}.Build())
+				g.Expect(err).To(HaveOccurred())
+				status, ok := grpcstatus.FromError(err)
+				g.Expect(ok).To(BeTrue())
+				g.Expect(status.Code()).To(Equal(grpccodes.NotFound))
+			}, time.Minute, time.Second).Should(Succeed())
+		})
+
+		getResp, err := bareMetalInstancesClient.Get(ctx, publicv1.BareMetalInstancesGetRequest_builder{
+			Id: bareMetalInstanceId,
+		}.Build())
+		Expect(err).ToNot(HaveOccurred())
+		image := getResp.GetObject().GetSpec().GetImage()
+		Expect(image).ToNot(BeNil())
+		Expect(image.GetSourceType()).To(Equal("registry"),
+			"Template default source_type should be applied")
+		Expect(image.GetSourceRef()).To(Equal("quay.io/default/os:latest"),
+			"Template default source_ref should be applied")
+	})
+
+	It("User-provided image overrides template spec_defaults image", func(ctx context.Context) {
+		imageTemplateResp, err := bareMetalInstanceTemplatesClient.Create(ctx,
+			privatev1.BareMetalInstanceTemplatesCreateRequest_builder{
+				Object: privatev1.BareMetalInstanceTemplate_builder{
+					Title:       "Template with overridable image default",
+					Description: "Template whose image default should be overridden by user.",
+					SpecDefaults: privatev1.BareMetalInstanceTemplateSpecDefaults_builder{
+						Image: privatev1.BareMetalInstanceImage_builder{
+							SourceType: "registry",
+							SourceRef:  "quay.io/default/os:latest",
+						}.Build(),
+					}.Build(),
+				}.Build(),
+			}.Build())
+		Expect(err).ToNot(HaveOccurred())
+		imageTemplateId := imageTemplateResp.GetObject().GetId()
+		DeferCleanup(func(ctx context.Context) {
+			_, err := bareMetalInstanceTemplatesClient.Delete(ctx, privatev1.BareMetalInstanceTemplatesDeleteRequest_builder{
+				Id: imageTemplateId,
+			}.Build())
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		imageCatalogResp, err := bareMetalInstanceCatalogItemsClient.Create(ctx,
+			privatev1.BareMetalInstanceCatalogItemsCreateRequest_builder{
+				Object: privatev1.BareMetalInstanceCatalogItem_builder{
+					Title:     "Catalog item for image override test",
+					Template:  imageTemplateId,
+					Published: true,
+				}.Build(),
+			}.Build())
+		Expect(err).ToNot(HaveOccurred())
+		imageCatalogItemId := imageCatalogResp.GetObject().GetId()
+		DeferCleanup(func(ctx context.Context) {
+			_, err := bareMetalInstanceCatalogItemsClient.Delete(ctx,
+				privatev1.BareMetalInstanceCatalogItemsDeleteRequest_builder{
+					Id: imageCatalogItemId,
+				}.Build())
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		createResp, err := bareMetalInstancesClient.Create(ctx, publicv1.BareMetalInstancesCreateRequest_builder{
+			Object: publicv1.BareMetalInstance_builder{
+				Spec: publicv1.BareMetalInstanceSpec_builder{
+					CatalogItem: imageCatalogItemId,
+					Image: publicv1.BareMetalInstanceImage_builder{
+						SourceType: "registry",
+						SourceRef:  "quay.io/user/custom:v2",
+					}.Build(),
+				}.Build(),
+			}.Build(),
+		}.Build())
+		Expect(err).ToNot(HaveOccurred())
+		bareMetalInstanceId := createResp.GetObject().GetId()
+		DeferCleanup(func(ctx context.Context) {
+			_, err := privateBareMetalInstancesClient.Delete(ctx, privatev1.BareMetalInstancesDeleteRequest_builder{
+				Id: bareMetalInstanceId,
+			}.Build())
+			Expect(err).ToNot(HaveOccurred())
+			Eventually(func(g Gomega) {
+				_, err := privateBareMetalInstancesClient.Get(ctx, privatev1.BareMetalInstancesGetRequest_builder{
+					Id: bareMetalInstanceId,
+				}.Build())
+				g.Expect(err).To(HaveOccurred())
+				status, ok := grpcstatus.FromError(err)
+				g.Expect(ok).To(BeTrue())
+				g.Expect(status.Code()).To(Equal(grpccodes.NotFound))
+			}, time.Minute, time.Second).Should(Succeed())
+		})
+
+		getResp, err := bareMetalInstancesClient.Get(ctx, publicv1.BareMetalInstancesGetRequest_builder{
+			Id: bareMetalInstanceId,
+		}.Build())
+		Expect(err).ToNot(HaveOccurred())
+		image := getResp.GetObject().GetSpec().GetImage()
+		Expect(image).ToNot(BeNil())
+		Expect(image.GetSourceType()).To(Equal("registry"))
+		Expect(image.GetSourceRef()).To(Equal("quay.io/user/custom:v2"),
+			"User-provided image should override template default")
+	})
+
+	It("Rejects image with missing source_type", func(ctx context.Context) {
+		_, err := bareMetalInstancesClient.Create(ctx, publicv1.BareMetalInstancesCreateRequest_builder{
+			Object: publicv1.BareMetalInstance_builder{
+				Spec: publicv1.BareMetalInstanceSpec_builder{
+					CatalogItem: catalogItemId,
+					Image: publicv1.BareMetalInstanceImage_builder{
+						SourceRef: "quay.io/test:latest",
+					}.Build(),
+				}.Build(),
+			}.Build(),
+		}.Build())
+		Expect(err).To(HaveOccurred())
+		status, ok := grpcstatus.FromError(err)
+		Expect(ok).To(BeTrue())
+		Expect(status.Code()).To(Equal(grpccodes.InvalidArgument))
+		Expect(status.Message()).To(ContainSubstring("image.source_type"))
+	})
+
+	It("Rejects image with missing source_ref", func(ctx context.Context) {
+		_, err := bareMetalInstancesClient.Create(ctx, publicv1.BareMetalInstancesCreateRequest_builder{
+			Object: publicv1.BareMetalInstance_builder{
+				Spec: publicv1.BareMetalInstanceSpec_builder{
+					CatalogItem: catalogItemId,
+					Image: publicv1.BareMetalInstanceImage_builder{
+						SourceType: "registry",
+					}.Build(),
+				}.Build(),
+			}.Build(),
+		}.Build())
+		Expect(err).To(HaveOccurred())
+		status, ok := grpcstatus.FromError(err)
+		Expect(ok).To(BeTrue())
+		Expect(status.Code()).To(Equal(grpccodes.InvalidArgument))
+		Expect(status.Message()).To(ContainSubstring("image.source_ref"))
+	})
+
+	It("Rejects update that changes image", func(ctx context.Context) {
+		createResp, err := bareMetalInstancesClient.Create(ctx, publicv1.BareMetalInstancesCreateRequest_builder{
+			Object: publicv1.BareMetalInstance_builder{
+				Spec: publicv1.BareMetalInstanceSpec_builder{
+					CatalogItem: catalogItemId,
+					Image: publicv1.BareMetalInstanceImage_builder{
+						SourceType: "registry",
+						SourceRef:  "quay.io/test:latest",
+					}.Build(),
+				}.Build(),
+			}.Build(),
+		}.Build())
+		Expect(err).ToNot(HaveOccurred())
+		bareMetalInstanceId := createResp.GetObject().GetId()
+		DeferCleanup(func(ctx context.Context) {
+			_, err := privateBareMetalInstancesClient.Delete(ctx, privatev1.BareMetalInstancesDeleteRequest_builder{
+				Id: bareMetalInstanceId,
+			}.Build())
+			Expect(err).ToNot(HaveOccurred())
+			Eventually(func(g Gomega) {
+				_, err := privateBareMetalInstancesClient.Get(ctx, privatev1.BareMetalInstancesGetRequest_builder{
+					Id: bareMetalInstanceId,
+				}.Build())
+				g.Expect(err).To(HaveOccurred())
+				status, ok := grpcstatus.FromError(err)
+				g.Expect(ok).To(BeTrue())
+				g.Expect(status.Code()).To(Equal(grpccodes.NotFound))
+			}, time.Minute, time.Second).Should(Succeed())
+		})
+
+		_, err = privateBareMetalInstancesClient.Update(ctx, privatev1.BareMetalInstancesUpdateRequest_builder{
+			Object: privatev1.BareMetalInstance_builder{
+				Id: bareMetalInstanceId,
+				Spec: privatev1.BareMetalInstanceSpec_builder{
+					CatalogItem: catalogItemId,
+					Image: privatev1.BareMetalInstanceImage_builder{
+						SourceType: "registry",
+						SourceRef:  "quay.io/other:latest",
+					}.Build(),
+				}.Build(),
+			}.Build(),
+			UpdateMask: &fieldmaskpb.FieldMask{
+				Paths: []string{"spec.image"},
+			},
+		}.Build())
+		Expect(err).To(HaveOccurred())
+		status, ok := grpcstatus.FromError(err)
+		Expect(ok).To(BeTrue())
+		Expect(status.Code()).To(Equal(grpccodes.InvalidArgument))
+		Expect(status.Message()).To(ContainSubstring("image is immutable"))
+	})
 })
