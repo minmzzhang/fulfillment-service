@@ -29,7 +29,7 @@ var _ = DescribeMigration("Create NAT gateways tables", func() {
 	DescribeTable(
 		"Creates the expected tables",
 		func(ctx context.Context, table string) {
-			err := tool.Migrate(ctx, 72)
+			err := tool.Migrate(ctx, 73)
 			Expect(err).ToNot(HaveOccurred())
 
 			quotedTable := pgx.Identifier{table}.Sanitize()
@@ -83,7 +83,7 @@ var _ = DescribeMigration("Create NAT gateways tables", func() {
 	}
 
 	It("Rejects duplicate active NATGateway for same VirtualNetwork", func(ctx context.Context) {
-		err := tool.Migrate(ctx, 72)
+		err := tool.Migrate(ctx, 73)
 		Expect(err).ToNot(HaveOccurred())
 
 		insertVN(ctx, "vn-1")
@@ -96,7 +96,7 @@ var _ = DescribeMigration("Create NAT gateways tables", func() {
 	})
 
 	It("Allows same VirtualNetwork after soft delete", func(ctx context.Context) {
-		err := tool.Migrate(ctx, 72)
+		err := tool.Migrate(ctx, 73)
 		Expect(err).ToNot(HaveOccurred())
 
 		insertVN(ctx, "vn-2")
@@ -111,7 +111,7 @@ var _ = DescribeMigration("Create NAT gateways tables", func() {
 	})
 
 	It("Allows different VirtualNetworks", func(ctx context.Context) {
-		err := tool.Migrate(ctx, 72)
+		err := tool.Migrate(ctx, 73)
 		Expect(err).ToNot(HaveOccurred())
 
 		insertVN(ctx, "vn-3")
@@ -125,7 +125,7 @@ var _ = DescribeMigration("Create NAT gateways tables", func() {
 	})
 
 	It("Rejects NATGateway referencing a non-existent VirtualNetwork", func(ctx context.Context) {
-		err := tool.Migrate(ctx, 72)
+		err := tool.Migrate(ctx, 73)
 		Expect(err).ToNot(HaveOccurred())
 
 		err = insertNATGateway(ctx, "ng-7", "no-such-vn", "eip-7")
@@ -137,7 +137,7 @@ var _ = DescribeMigration("Create NAT gateways tables", func() {
 	})
 
 	It("Rejects NATGateway referencing a soft-deleted VirtualNetwork", func(ctx context.Context) {
-		err := tool.Migrate(ctx, 72)
+		err := tool.Migrate(ctx, 73)
 		Expect(err).ToNot(HaveOccurred())
 
 		insertVN(ctx, "vn-deleted")
@@ -154,7 +154,7 @@ var _ = DescribeMigration("Create NAT gateways tables", func() {
 	})
 
 	It("Prevents soft-deleting a VirtualNetwork with active NATGateway", func(ctx context.Context) {
-		err := tool.Migrate(ctx, 72)
+		err := tool.Migrate(ctx, 73)
 		Expect(err).ToNot(HaveOccurred())
 
 		insertVN(ctx, "vn-protected")
@@ -173,7 +173,7 @@ var _ = DescribeMigration("Create NAT gateways tables", func() {
 	})
 
 	It("Allows soft-deleting VirtualNetwork after NATGateway is soft-deleted", func(ctx context.Context) {
-		err := tool.Migrate(ctx, 72)
+		err := tool.Migrate(ctx, 73)
 		Expect(err).ToNot(HaveOccurred())
 
 		insertVN(ctx, "vn-released")
