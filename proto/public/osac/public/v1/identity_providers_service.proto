@@ -56,30 +56,6 @@ message IdentityProvidersListResponse {
   repeated IdentityProvider items = 3;
 }
 
-// Request to list all available identity providers.
-message IdentityProvidersListAvailableRequest {
-  // Index of the first result. If not specified the default value will be zero.
-  optional int32 offset = 1;
-
-  // Maximum number of results to be returned by the server.
-  optional int32 limit = 2;
-
-  // Filter criteria. CEL expression to filter identity providers.
-  optional string filter = 3;
-}
-
-// Response containing the list of available identity providers.
-message IdentityProvidersListAvailableResponse {
-  // Actual number of items returned.
-  int32 size = 1;
-
-  // Total number of items that match the search criteria.
-  int32 total = 2;
-
-  // List of identity providers available.
-  repeated IdentityProvider items = 3;
-}
-
 // Request to get a tenant's identity provider by ID.
 message IdentityProvidersGetRequest {
   // ID of the identity provider.
@@ -139,13 +115,6 @@ service IdentityProviders {
   rpc List(IdentityProvidersListRequest) returns (IdentityProvidersListResponse) {
     option (google.api.http) = {
       get: "/api/fulfillment/v1/identity_providers"
-    };
-  }
-
-  // Lists all identity providers available.
-  rpc ListAvailable(IdentityProvidersListAvailableRequest) returns (IdentityProvidersListAvailableResponse) {
-    option (google.api.http) = {
-      get: "/api/fulfillment/v1/identity_providers:list-available"
     };
   }
 

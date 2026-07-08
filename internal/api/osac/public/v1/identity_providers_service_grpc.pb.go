@@ -32,12 +32,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	IdentityProviders_Create_FullMethodName        = "/osac.public.v1.IdentityProviders/Create"
-	IdentityProviders_List_FullMethodName          = "/osac.public.v1.IdentityProviders/List"
-	IdentityProviders_ListAvailable_FullMethodName = "/osac.public.v1.IdentityProviders/ListAvailable"
-	IdentityProviders_Get_FullMethodName           = "/osac.public.v1.IdentityProviders/Get"
-	IdentityProviders_Update_FullMethodName        = "/osac.public.v1.IdentityProviders/Update"
-	IdentityProviders_Delete_FullMethodName        = "/osac.public.v1.IdentityProviders/Delete"
+	IdentityProviders_Create_FullMethodName = "/osac.public.v1.IdentityProviders/Create"
+	IdentityProviders_List_FullMethodName   = "/osac.public.v1.IdentityProviders/List"
+	IdentityProviders_Get_FullMethodName    = "/osac.public.v1.IdentityProviders/Get"
+	IdentityProviders_Update_FullMethodName = "/osac.public.v1.IdentityProviders/Update"
+	IdentityProviders_Delete_FullMethodName = "/osac.public.v1.IdentityProviders/Delete"
 )
 
 // IdentityProvidersClient is the client API for IdentityProviders service.
@@ -54,8 +53,6 @@ type IdentityProvidersClient interface {
 	// Lists identity providers assigned to a tenant.
 	// Use filter with metadata.tenant to scope to a specific tenant.
 	List(ctx context.Context, in *IdentityProvidersListRequest, opts ...grpc.CallOption) (*IdentityProvidersListResponse, error)
-	// Lists all identity providers available.
-	ListAvailable(ctx context.Context, in *IdentityProvidersListAvailableRequest, opts ...grpc.CallOption) (*IdentityProvidersListAvailableResponse, error)
 	// Retrieves an identity provider by ID.
 	Get(ctx context.Context, in *IdentityProvidersGetRequest, opts ...grpc.CallOption) (*IdentityProvidersGetResponse, error)
 	// Updates an existing identity provider.
@@ -86,16 +83,6 @@ func (c *identityProvidersClient) List(ctx context.Context, in *IdentityProvider
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(IdentityProvidersListResponse)
 	err := c.cc.Invoke(ctx, IdentityProviders_List_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *identityProvidersClient) ListAvailable(ctx context.Context, in *IdentityProvidersListAvailableRequest, opts ...grpc.CallOption) (*IdentityProvidersListAvailableResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(IdentityProvidersListAvailableResponse)
-	err := c.cc.Invoke(ctx, IdentityProviders_ListAvailable_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -146,8 +133,6 @@ type IdentityProvidersServer interface {
 	// Lists identity providers assigned to a tenant.
 	// Use filter with metadata.tenant to scope to a specific tenant.
 	List(context.Context, *IdentityProvidersListRequest) (*IdentityProvidersListResponse, error)
-	// Lists all identity providers available.
-	ListAvailable(context.Context, *IdentityProvidersListAvailableRequest) (*IdentityProvidersListAvailableResponse, error)
 	// Retrieves an identity provider by ID.
 	Get(context.Context, *IdentityProvidersGetRequest) (*IdentityProvidersGetResponse, error)
 	// Updates an existing identity provider.
@@ -169,9 +154,6 @@ func (UnimplementedIdentityProvidersServer) Create(context.Context, *IdentityPro
 }
 func (UnimplementedIdentityProvidersServer) List(context.Context, *IdentityProvidersListRequest) (*IdentityProvidersListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method List not implemented")
-}
-func (UnimplementedIdentityProvidersServer) ListAvailable(context.Context, *IdentityProvidersListAvailableRequest) (*IdentityProvidersListAvailableResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ListAvailable not implemented")
 }
 func (UnimplementedIdentityProvidersServer) Get(context.Context, *IdentityProvidersGetRequest) (*IdentityProvidersGetResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Get not implemented")
@@ -235,24 +217,6 @@ func _IdentityProviders_List_Handler(srv interface{}, ctx context.Context, dec f
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(IdentityProvidersServer).List(ctx, req.(*IdentityProvidersListRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _IdentityProviders_ListAvailable_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(IdentityProvidersListAvailableRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(IdentityProvidersServer).ListAvailable(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: IdentityProviders_ListAvailable_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(IdentityProvidersServer).ListAvailable(ctx, req.(*IdentityProvidersListAvailableRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -325,10 +289,6 @@ var IdentityProviders_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "List",
 			Handler:    _IdentityProviders_List_Handler,
-		},
-		{
-			MethodName: "ListAvailable",
-			Handler:    _IdentityProviders_ListAvailable_Handler,
 		},
 		{
 			MethodName: "Get",
