@@ -17,6 +17,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2/dsl/core"
@@ -30,6 +31,7 @@ import (
 	privatev1 "github.com/osac-project/fulfillment-service/internal/api/osac/private/v1"
 	publicv1 "github.com/osac-project/fulfillment-service/internal/api/osac/public/v1"
 	"github.com/osac-project/fulfillment-service/internal/kubernetes/labels"
+	"github.com/osac-project/fulfillment-service/internal/uuid"
 )
 
 var _ = Describe("BareMetalInstance lifecycle", func() {
@@ -49,9 +51,12 @@ var _ = Describe("BareMetalInstance lifecycle", func() {
 		bareMetalInstanceTemplatesClient = privatev1.NewBareMetalInstanceTemplatesClient(tool.InternalView().AdminConn())
 		bareMetalInstanceCatalogItemsClient = privatev1.NewBareMetalInstanceCatalogItemsClient(tool.InternalView().AdminConn())
 
-		// Create BareMetalInstanceTemplate
+		// Create BareMetalInstanceTemplate with an explicit ID that matches the BMFO CRD
+		// validation pattern (^[a-zA-Z_][a-zA-Z0-9._]*$). Auto-generated UUIDs start with
+		// a digit and are rejected by the CRD when the controller creates the CR.
 		templateResp, err := bareMetalInstanceTemplatesClient.Create(ctx, privatev1.BareMetalInstanceTemplatesCreateRequest_builder{
 			Object: privatev1.BareMetalInstanceTemplate_builder{
+				Id:          fmt.Sprintf("test_template_%s", strings.ReplaceAll(uuid.New(), "-", "_")),
 				Title:       "Test BMI Template",
 				Description: "Template for bare metal instance lifecycle test.",
 			}.Build(),
@@ -278,6 +283,7 @@ var _ = Describe("BareMetalInstance lifecycle", func() {
 		imageTemplateResp, err := bareMetalInstanceTemplatesClient.Create(ctx,
 			privatev1.BareMetalInstanceTemplatesCreateRequest_builder{
 				Object: privatev1.BareMetalInstanceTemplate_builder{
+					Id:          fmt.Sprintf("test_image_default_%s", strings.ReplaceAll(uuid.New(), "-", "_")),
 					Title:       "Template with image default",
 					Description: "Template that provides a default image via spec_defaults.",
 					SpecDefaults: privatev1.BareMetalInstanceTemplateSpecDefaults_builder{
@@ -356,6 +362,7 @@ var _ = Describe("BareMetalInstance lifecycle", func() {
 		imageTemplateResp, err := bareMetalInstanceTemplatesClient.Create(ctx,
 			privatev1.BareMetalInstanceTemplatesCreateRequest_builder{
 				Object: privatev1.BareMetalInstanceTemplate_builder{
+					Id:          fmt.Sprintf("test_image_override_%s", strings.ReplaceAll(uuid.New(), "-", "_")),
 					Title:       "Template with overridable image default",
 					Description: "Template whose image default should be overridden by user.",
 					SpecDefaults: privatev1.BareMetalInstanceTemplateSpecDefaults_builder{
