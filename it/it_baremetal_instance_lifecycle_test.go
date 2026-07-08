@@ -15,6 +15,8 @@ package it
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2/dsl/core"
@@ -22,9 +24,12 @@ import (
 	grpccodes "google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
+	crclient "sigs.k8s.io/controller-runtime/pkg/client"
 
+	bmfov1alpha1 "github.com/osac-project/bare-metal-fulfillment-operator/api/v1alpha1"
 	privatev1 "github.com/osac-project/fulfillment-service/internal/api/osac/private/v1"
 	publicv1 "github.com/osac-project/fulfillment-service/internal/api/osac/public/v1"
+	"github.com/osac-project/fulfillment-service/internal/kubernetes/labels"
 )
 
 var _ = Describe("BareMetalInstance lifecycle", func() {
@@ -192,13 +197,47 @@ var _ = Describe("BareMetalInstance lifecycle", func() {
 		Expect(image.GetSourceType()).To(Equal("registry"))
 		Expect(image.GetSourceRef()).To(Equal("quay.io/test/rhel9:latest"))
 
-		// TODO: Add BMFO CR propagation check once the BMI reconciler watch is verified
-		// in the IT environment. The infrastructure is in place (CRD installed, scheme
-		// registered) but the controller doesn't reconcile BMIs during tests — the watch
-		// stream for bare_metal_instance events doesn't appear to fire. The cluster
-		// reconciler test works because cluster events do fire. This needs investigation
-		// into why the BMI event filter doesn't trigger in the IT controller.
-		// See osac-1970/osac-1973/it-failure-analysis.md for details.
+		// Wait for the controller to reconcile (state moves from UNSPECIFIED)
+		kubeClient := tool.KubeClient()
+		Eventually(func(g Gomega) {
+			resp, err := privateBareMetalInstancesClient.Get(ctx, privatev1.BareMetalInstancesGetRequest_builder{
+				Id: bareMetalInstanceId,
+			}.Build())
+			g.Expect(err).ToNot(HaveOccurred())
+			bmi := resp.GetObject()
+			state := bmi.GetStatus().GetState()
+			hub := bmi.GetStatus().GetHub()
+			finalizers := bmi.GetMetadata().GetFinalizers()
+			// Debug: print BMI state on each poll so we can see controller progress
+			fmt.Fprintf(GinkgoWriter, "[DEBUG] BMI id=%s state=%s hub=%q finalizers=%v\n",
+				bareMetalInstanceId, state, hub, finalizers)
+			g.Expect(state).ToNot(
+				Equal(privatev1.BareMetalInstanceState_BARE_METAL_INSTANCE_STATE_UNSPECIFIED),
+				"controller should reconcile the BMI and set state")
+		}, time.Minute, time.Second).Should(Succeed())
+
+		// Verify the controller creates a BMFO BareMetalInstance CR on the cluster
+		bmiList := &bmfov1alpha1.BareMetalInstanceList{}
+		var kubeObject *bmfov1alpha1.BareMetalInstance
+		Eventually(
+			func(g Gomega) {
+				err := kubeClient.List(ctx, bmiList, crclient.MatchingLabels{
+					labels.BareMetalInstanceUuid: bareMetalInstanceId,
+				})
+				g.Expect(err).ToNot(HaveOccurred())
+				fmt.Fprintf(GinkgoWriter, "[DEBUG] BMFO CR count=%d\n", len(bmiList.Items))
+				g.Expect(bmiList.Items).To(HaveLen(1))
+				kubeObject = &bmiList.Items[0]
+			},
+			time.Minute,
+			time.Second,
+		).Should(Succeed())
+
+		Expect(kubeObject.GetNamespace()).To(Equal(hubNamespace))
+
+		var params map[string]string
+		Expect(json.Unmarshal([]byte(kubeObject.Spec.TemplateParameters), &params)).To(Succeed())
+		Expect(params).To(HaveKeyWithValue("imageURL", "quay.io/test/rhel9:latest"))
 	})
 
 	It("Creates BareMetalInstance without image when no template default", func(ctx context.Context) {
