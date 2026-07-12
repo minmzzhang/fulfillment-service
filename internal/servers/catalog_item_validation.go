@@ -89,7 +89,7 @@ func validateFieldDefinitions(fieldDefinitions []*privatev1.FieldDefinition) err
 
 // applyFieldDefinitions validates and applies field definitions from a catalog item against a resource spec.
 // Rejects any spec field not listed in field_definitions (except system fields catalog_item, template and template_parameters).
-// For non-editable fields: applies the catalog item default (overriding any user-provided value).
+// For non-editable fields: rejects user-provided values; applies the catalog item default.
 // For editable fields with user values: validates against the JSON Schema.
 // For editable fields without user values: applies the catalog item default.
 func applyFieldDefinitions(
@@ -145,6 +145,10 @@ func applyFieldDefinitions(
 		userVal, userHasValue := getNestedValue(specMap, path)
 
 		if !fd.GetEditable() {
+			if userHasValue && userVal != nil {
+				return grpcstatus.Errorf(grpccodes.InvalidArgument,
+					"field '%s' is not editable", path)
+			}
 			if err := applyDefault(specMap, path, defaultVal); err != nil {
 				return err
 			}
