@@ -111,8 +111,8 @@ var _ = Describe("Host types server", func() {
 			}
 			createResponse, err := server.Create(ctx, publicv1.HostTypesCreateRequest_builder{
 				Object: publicv1.HostType_builder{
-					Title:       "BM host type",
-					Interfaces:  interfaces,
+					Title:      "BM host type",
+					Interfaces: interfaces,
 				}.Build(),
 			}.Build())
 			Expect(err).ToNot(HaveOccurred())
