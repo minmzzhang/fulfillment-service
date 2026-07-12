@@ -17,6 +17,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net/netip"
 	"sort"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -376,12 +377,66 @@ func (s *PrivateNetworkClassesServer) validateNetworkClass(ctx context.Context,
 		return grpcstatus.Errorf(grpccodes.InvalidArgument, "field 'fabric_manager' is required")
 	}
 
+	// NC-VAL-08: Validate defaults if present
+	if defaults := newNC.GetDefaults(); defaults != nil {
+		if err := validateNetworkDefaults(defaults); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
 // cloneNetworkClass creates a deep copy of a NetworkClass.
 func cloneNetworkClass(nc *privatev1.NetworkClass) *privatev1.NetworkClass {
 	return proto.Clone(nc).(*privatev1.NetworkClass)
+}
+
+// validateNetworkDefaults validates the NetworkDefaults configuration.
+func validateNetworkDefaults(defaults *privatev1.NetworkDefaults) error {
+	vnCIDR := defaults.GetVirtualNetworkCidr()
+	subnetCIDR := defaults.GetSubnetCidr()
+
+	var vnPrefix netip.Prefix
+	if vnCIDR != "" {
+		parsed, err := parseAndValidateCIDR(vnCIDR, cidrIPv4)
+		if err != nil {
+			return grpcstatus.Errorf(grpccodes.InvalidArgument,
+				"defaults.virtual_network_cidr: %v", err)
+		}
+		vnPrefix, _ = netip.ParsePrefix(parsed)
+		_ = vnPrefix
+	}
+
+	if subnetCIDR != "" {
+		_, err := parseAndValidateCIDR(subnetCIDR, cidrIPv4)
+		if err != nil {
+			return grpcstatus.Errorf(grpccodes.InvalidArgument,
+				"defaults.subnet_cidr: %v", err)
+		}
+
+		if vnCIDR != "" {
+			subnetPrefix, _ := netip.ParsePrefix(subnetCIDR)
+			if !vnPrefix.Contains(subnetPrefix.Addr()) || subnetPrefix.Bits() < vnPrefix.Bits() {
+				return grpcstatus.Errorf(grpccodes.InvalidArgument,
+					"defaults.subnet_cidr '%s' is not within defaults.virtual_network_cidr '%s'",
+					subnetCIDR, vnCIDR)
+			}
+		}
+	}
+
+	for i, rule := range defaults.GetIngressRules() {
+		if err := validateSecurityRule(rule, "defaults.ingress", i); err != nil {
+			return err
+		}
+	}
+	for i, rule := range defaults.GetEgressRules() {
+		if err := validateSecurityRule(rule, "defaults.egress", i); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // applyNetworkClassUpdate applies the update fields onto the base object,
