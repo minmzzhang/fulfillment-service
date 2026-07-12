@@ -17,6 +17,7 @@ package osac.public.v1;
 
 import "google/api/field_behavior.proto";
 import "osac/public/v1/metadata_type.proto";
+import "osac/public/v1/security_group_type.proto";
 
 // Describes a network implementation strategy available for creating virtual networks.
 //
@@ -57,6 +58,35 @@ message NetworkClass {
   optional bool is_default = 9 [
     (google.api.field_behavior) = OUTPUT_ONLY
   ];
+
+  // Default networking configuration for tenant onboarding. When a tenant is created, the system uses these
+  // defaults to auto-create a VirtualNetwork, Subnet, and SecurityGroup for the tenant.
+  NetworkDefaults defaults = 12 [
+    (google.api.field_behavior) = OUTPUT_ONLY
+  ];
+}
+
+// Default networking configuration used during tenant onboarding.
+//
+// When a tenant is created, the system reads these defaults from the NetworkClass and auto-creates
+// a default VirtualNetwork (using virtual_network_cidr), Subnet (using subnet_cidr), and SecurityGroup
+// (using ingress_rules and egress_rules) for the tenant. All fields are optional — defaults can be
+// partially populated (e.g., CIDRs only without security rules).
+message NetworkDefaults {
+  // Default CIDR for auto-created tenant VirtualNetwork. Must be valid IPv4 CIDR notation.
+  // Example: "10.0.0.0/16"
+  string virtual_network_cidr = 1;
+
+  // Default CIDR for auto-created tenant Subnet. Must be valid IPv4 CIDR notation and fall within the
+  // virtual_network_cidr range.
+  // Example: "10.0.1.0/24"
+  string subnet_cidr = 2;
+
+  // Default ingress rules for auto-created tenant SecurityGroup.
+  repeated SecurityRule ingress_rules = 3;
+
+  // Default egress rules for auto-created tenant SecurityGroup.
+  repeated SecurityRule egress_rules = 4;
 }
 
 // Describes the capabilities supported by a NetworkClass.
