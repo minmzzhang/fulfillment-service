@@ -225,6 +225,9 @@ func (s *PrivateStorageTiersServer) validateStorageTierUpdate(ctx context.Contex
 					"field 'spec.backends' is required and must not be empty")
 			}
 		}
+	} else if len(backends) == 0 {
+		return grpcstatus.Errorf(grpccodes.InvalidArgument,
+			"field 'spec.backends' is required and must not be empty")
 	}
 	if len(backends) > 0 {
 		if err := s.validateBackends(ctx, backends); err != nil {

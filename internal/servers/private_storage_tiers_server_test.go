@@ -600,6 +600,24 @@ var _ = Describe("Private storage tiers server", func() {
 				Expect(st.Code()).To(Equal(codes.InvalidArgument))
 				Expect(st.Message()).To(ContainSubstring("backends"))
 			})
+
+			It("Update without mask and without backends fails", func() {
+				created := createStorageTier()
+
+				_, err := server.Update(ctx, privatev1.StorageTiersUpdateRequest_builder{
+					Object: privatev1.StorageTier_builder{
+						Id: created.GetId(),
+						Spec: privatev1.StorageTierSpec_builder{
+							Description: "no backends",
+						}.Build(),
+					}.Build(),
+				}.Build())
+				Expect(err).To(HaveOccurred())
+				st, ok := status.FromError(err)
+				Expect(ok).To(BeTrue())
+				Expect(st.Code()).To(Equal(codes.InvalidArgument))
+				Expect(st.Message()).To(ContainSubstring("backends"))
+			})
 		})
 
 		Describe("Immutability", func() {
@@ -707,7 +725,8 @@ var _ = Describe("Private storage tiers server", func() {
 							Version: created.GetMetadata().GetVersion(),
 						}.Build(),
 					}.Build(),
-					Lock: true,
+					UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"spec.description"}},
+					Lock:       true,
 				}.Build())
 				Expect(err).To(HaveOccurred())
 				st, ok := status.FromError(err)
