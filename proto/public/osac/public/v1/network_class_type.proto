@@ -76,9 +76,8 @@ message NetworkClassSpec {
 // Default networking configuration used during tenant onboarding.
 //
 // When a tenant is created, the system reads these defaults from the NetworkClass and auto-creates
-// a default VirtualNetwork (using virtual_network_cidr), Subnet (using subnet_cidr), and SecurityGroup
-// (using ingress_rules and egress_rules) for the tenant. All fields are optional — defaults can be
-// partially populated (e.g., CIDRs only without security rules).
+// a default VirtualNetwork, IPv4 Subnet, IPv6 Subnet, SecurityGroup, and optionally a NATGateway
+// for the tenant. All fields are optional — defaults can be partially populated.
 message NetworkDefaults {
   option (buf.validate.message).cel = {
     id: "subnet_ipv4_requires_virtual_network_ipv4"
@@ -128,6 +127,11 @@ message NetworkDefaults {
 
   // Default egress rules for auto-created tenant SecurityGroup.
   repeated SecurityRule egress_rules = 4;
+
+  // Whether to create a default NATGateway on the tenant's default VirtualNetwork.
+  // When true, tenant onboarding auto-allocates an ExternalIP and creates a NATGateway
+  // to provide SNAT for outbound connectivity.
+  bool enable_nat_gateway = 7;
 }
 
 // Describes the capabilities supported by a NetworkClass.
