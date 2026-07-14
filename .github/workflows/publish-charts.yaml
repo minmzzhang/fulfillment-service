@@ -24,6 +24,8 @@ jobs:
   guard:
     name: Verify image build succeeded
     runs-on: ubuntu-latest
+    # Read-only job: only inspects workflow_run event metadata, no repo/API access needed.
+    permissions: {}
     if: >
       github.event.workflow_run.event == 'push' &&
       startsWith(github.event.workflow_run.head_branch, 'v')
@@ -32,17 +34,26 @@ jobs:
       sha: ${{ github.event.workflow_run.head_sha }}
     steps:
     - name: Check image build result
+      env:
+        CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+        HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
       run: |
-        if [[ "${{ github.event.workflow_run.conclusion }}" != "success" ]]; then
-          echo "::error::Image build for tag ${{ github.event.workflow_run.head_branch }} did not succeed (conclusion: ${{ github.event.workflow_run.conclusion }}). Refusing to publish chart."
+        semver_re='^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+(-[0-9A-Za-z]+)*(\.[0-9A-Za-z]+(-[0-9A-Za-z]+)*)*)?(\+[0-9A-Za-z]+(-[0-9A-Za-z]+)*(\.[0-9A-Za-z]+(-[0-9A-Za-z]+)*)*)?$'
+        if ! [[ "$HEAD_BRANCH" =~ $semver_re ]]; then
+          echo "::error::Tag '$HEAD_BRANCH' is not a valid semver release tag"
           exit 1
         fi
-        echo "Image build succeeded for tag ${{ github.event.workflow_run.head_branch }}"
+        if [[ "$CONCLUSION" != "success" ]]; then
+          echo "::error::Image build for tag $HEAD_BRANCH did not succeed (conclusion: $CONCLUSION). Refusing to publish chart."
+          exit 1
+        fi
+        echo "Image build succeeded for tag $HEAD_BRANCH"
 
   publish-service-chart:
     name: Publish service chart
     needs: guard
     runs-on: ubuntu-latest
+    # contents: read to checkout; packages: write to push the chart to GHCR.
     permissions:
       contents: read
       packages: write
