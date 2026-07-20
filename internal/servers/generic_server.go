@@ -572,14 +572,18 @@ func (s *GenericServer[O]) createDryRun(ctx context.Context, request any, respon
 	return nil
 }
 
-const dryRunMetadataKey = "x-dry-run"
+// DryRunHTTPHeader is the HTTP header name REST clients use to request dry-run mode.
+// The REST gateway forwards it as gRPC metadata with key DryRunMetadataKey.
+const DryRunHTTPHeader = "X-Dry-Run"
+
+const DryRunMetadataKey = "x-dry-run"
 
 func isDryRun(ctx context.Context) bool {
 	md, ok := grpcmetadata.FromIncomingContext(ctx)
 	if !ok {
 		return false
 	}
-	values := md.Get(dryRunMetadataKey)
+	values := md.Get(DryRunMetadataKey)
 	for _, v := range values {
 		if strings.EqualFold(v, "true") {
 			return true
