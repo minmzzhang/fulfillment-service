@@ -33,6 +33,7 @@ import (
 	"github.com/osac-project/fulfillment-service/internal/cmd/cli/create/baremetalinstancecatalogitem"
 	"github.com/osac-project/fulfillment-service/internal/cmd/cli/create/cluster"
 	"github.com/osac-project/fulfillment-service/internal/cmd/cli/create/clustercatalogitem"
+	"github.com/osac-project/fulfillment-service/internal/cmd/cli/create/clusterversion"
 	"github.com/osac-project/fulfillment-service/internal/cmd/cli/create/computeinstance"
 	"github.com/osac-project/fulfillment-service/internal/cmd/cli/create/computeinstancecatalogitem"
 	"github.com/osac-project/fulfillment-service/internal/cmd/cli/create/externalip"
@@ -66,6 +67,7 @@ func Cmd() *cobra.Command {
 	result.AddCommand(baremetalinstancecatalogitem.Cmd())
 	result.AddCommand(cluster.Cmd())
 	result.AddCommand(clustercatalogitem.Cmd())
+	result.AddCommand(clusterversion.Cmd())
 	result.AddCommand(computeinstance.Cmd())
 	result.AddCommand(computeinstancecatalogitem.Cmd())
 	result.AddCommand(externalip.Cmd())

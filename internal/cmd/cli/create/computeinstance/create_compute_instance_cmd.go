@@ -338,8 +338,8 @@ func (c *runnerContext) findTemplate(ctx context.Context) (result *publicv1.Comp
 		c.args.template,
 	)
 	response, err := c.templatesClient.List(ctx, publicv1.ComputeInstanceTemplatesListRequest_builder{
-		Filter: new(filter),
-		Limit:  new(int32(10)),
+		Filter: proto.String(filter),
+		Limit:  proto.Int32(10),
 	}.Build())
 	if err != nil {
 		return nil, fmt.Errorf("failed to list templates: %w", err)
@@ -366,7 +366,7 @@ func (c *runnerContext) findTemplate(ctx context.Context) (result *publicv1.Comp
 
 	// If we are here then no matches were found, we will show to the user some of the available templates:
 	response, err = c.templatesClient.List(ctx, publicv1.ComputeInstanceTemplatesListRequest_builder{
-		Limit: new(int32(10)),
+		Limit: proto.Int32(10),
 	}.Build())
 	if err != nil {
 		return nil, fmt.Errorf("failed to list templates: %w", err)
@@ -709,10 +709,10 @@ func (c *runnerContext) buildSpec(templateID string,
 		}.Build()
 	}
 	if c.args.instanceType != "" {
-		spec.InstanceType = new(c.args.instanceType)
+		spec.InstanceType = proto.String(c.args.instanceType)
 	}
 	if c.args.sshPublicKey != "" {
-		spec.SshPublicKey = new(c.args.sshPublicKey)
+		spec.SshPublicKey = proto.String(c.args.sshPublicKey)
 	}
 	if c.args.bootDiskSizeGiB > 0 {
 		spec.BootDisk = publicv1.ComputeInstanceDisk_builder{
@@ -727,13 +727,13 @@ func (c *runnerContext) buildSpec(templateID string,
 		spec.AdditionalDisks = disks
 	}
 	if c.args.runStrategy != "" {
-		spec.RunStrategy = new(c.args.runStrategy)
+		spec.RunStrategy = proto.String(c.args.runStrategy)
 	}
 	if c.args.userData != "" {
-		spec.UserData = new(c.args.userData)
+		spec.UserData = proto.String(c.args.userData)
 	}
 	if c.args.windows {
-		spec.IsWindows = new(true)
+		spec.IsWindows = proto.Bool(true)
 	}
 	if err := c.applyNetworkingFlags(&spec); err != nil {
 		return nil, err
@@ -855,10 +855,10 @@ func (c *runnerContext) buildSpecFromCatalogItem(catalogItemID string) (*publicv
 		}.Build()
 	}
 	if c.args.instanceType != "" {
-		spec.InstanceType = new(c.args.instanceType)
+		spec.InstanceType = proto.String(c.args.instanceType)
 	}
 	if c.args.sshPublicKey != "" {
-		spec.SshPublicKey = new(c.args.sshPublicKey)
+		spec.SshPublicKey = proto.String(c.args.sshPublicKey)
 	}
 	if c.args.bootDiskSizeGiB > 0 {
 		spec.BootDisk = publicv1.ComputeInstanceDisk_builder{
@@ -873,13 +873,13 @@ func (c *runnerContext) buildSpecFromCatalogItem(catalogItemID string) (*publicv
 		spec.AdditionalDisks = disks
 	}
 	if c.args.runStrategy != "" {
-		spec.RunStrategy = new(c.args.runStrategy)
+		spec.RunStrategy = proto.String(c.args.runStrategy)
 	}
 	if c.args.userData != "" {
-		spec.UserData = new(c.args.userData)
+		spec.UserData = proto.String(c.args.userData)
 	}
 	if c.args.windows {
-		spec.IsWindows = new(true)
+		spec.IsWindows = proto.Bool(true)
 	}
 	if err := c.applyNetworkingFlags(&spec); err != nil {
 		return nil, err

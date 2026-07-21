@@ -18,6 +18,7 @@ import (
 
 	"github.com/osac-project/fulfillment-service/internal/cmd/cli/describe/baremetalinstance"
 	"github.com/osac-project/fulfillment-service/internal/cmd/cli/describe/cluster"
+	"github.com/osac-project/fulfillment-service/internal/cmd/cli/describe/clusterversion"
 	"github.com/osac-project/fulfillment-service/internal/cmd/cli/describe/computeinstance"
 	"github.com/osac-project/fulfillment-service/internal/cmd/cli/describe/externalip"
 	"github.com/osac-project/fulfillment-service/internal/cmd/cli/describe/externalipattachment"
@@ -41,6 +42,7 @@ func Cmd() *cobra.Command {
 	}
 	result.AddCommand(baremetalinstance.Cmd())
 	result.AddCommand(cluster.Cmd())
+	result.AddCommand(clusterversion.Cmd())
 	result.AddCommand(computeinstance.Cmd())
 	result.AddCommand(externalip.Cmd())
 	result.AddCommand(externalipattachment.Cmd())
