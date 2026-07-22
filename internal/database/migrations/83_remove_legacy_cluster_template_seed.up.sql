@@ -11,4 +11,5 @@
 -- specific language governing permissions and limitations under the License.
 --
 
-delete from cluster_templates where id = 'ocp_4_17_small';
+delete from cluster_templates
+where id = 'ocp_4_17_small';

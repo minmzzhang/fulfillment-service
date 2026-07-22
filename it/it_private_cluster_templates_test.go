@@ -54,6 +54,11 @@ var _ = Describe("Private cluster templates", func() {
 		Expect(listResponse).ToNot(BeNil())
 		items := listResponse.GetItems()
 		Expect(items).ToNot(BeEmpty())
+		ids := make([]string, len(items))
+		for i, item := range items {
+			ids[i] = item.GetId()
+		}
+		Expect(ids).To(ContainElement(id))
 	})
 
 	It("Can get a specific template", func() {
